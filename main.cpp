@@ -37,6 +37,26 @@ void on_mouse(int event, int x, int y, int flags, void *param) {
 }
 
 
+// 時刻変換(hhmmss -> s)
+int second(int time) {
+    double h = floor(time / 10000);
+    double m = floor((time - (h * 10000)) / 100);
+    double s = time - (m * 100) - (h * 10000);
+    int second = (int)(h * 3600 + m * 60 + s);
+    return second;
+}
+
+
+// 時刻変換(s -> hhmmss)
+int hour(int time) {
+    double h = floor(time / 3600);
+    double m = floor((time - (h * 3600)) / 60);
+    double s = time - (m * 60) - (h * 3600);
+    int hour = (int)(h * 10000 + m * 100 + s);
+    return hour;
+}
+
+
 // 水平線描画(img)
 void drawHorizon() {
     cv::line(img, cv::Point(0, pro.horizon)\
@@ -86,7 +106,7 @@ void drawImageLine() {
 void drawImageString() {
     if (strflag == 0) {
         std::stringstream str;
-        str << std::to_string(pro.elapsedTime) << "[s]";
+        str << std::to_string(pro.elapsedTime) << "[hhmmss]";
         cv::putText(img, str.str(), cv::Point(10,250),\
                     cv::FONT_ITALIC, 10.0,\
                     cv::Scalar(200,0,200), 8, CV_AA);
@@ -101,6 +121,7 @@ void drawImageString() {
 
 // 緯度経度計算・描画(img)
 void drawShipPosition() {
+    // open DB
     sqlite3 *db = NULL;
     
     int result = sqlite3_open(pro.dbname.c_str(), &db);
@@ -111,9 +132,11 @@ void drawShipPosition() {
     
     sqlite3_stmt *stmt = NULL;
     int qresult;
-    std::string time = std::to_string(pro.elapsedTime);
-    std::string sql = "select mmsi, lon, lat from timeline1 where time = " + time;
     
+    // 指定時刻のmmsi, lat, lon取得
+    std::string stdtime = std::to_string(pro.elapsedTime);
+    std::string sql = "select mmsi, lon, lat from dec1 where time like '%"\
+                    + stdtime + "'";
     std::cout << sql << std::endl;
     
     // カメラ回転角度[degree]
@@ -138,13 +161,20 @@ void drawShipPosition() {
                     0.0, 0.0, 1.0
                     );
     
-    // カメラアングル
+    // カメラアングル制限(cameraMin[deg], cameraMax[deg])
     double cameraMin = rz - (pro.fovX / 2.0);
     double cameraMax = rz + (pro.fovX / 2.0);
-    if (cameraMin > 360.0)
+    if (cameraMin >= 360.0)
         cameraMin = cameraMin - 360.0;
-    if (cameraMax > 360.0)
+    if (cameraMin < 0)
+        cameraMin = cameraMin + 360;
+    if (cameraMax >= 360.0)
         cameraMax = cameraMax - 360.0;
+    if (cameraMax < 0)
+        cameraMax = cameraMax + 360;
+    
+    // 距離制限(distMax[m])
+    double distMax = 5 * 1852;
     
     // 撮影点ECEF
     double own[3] = {0.0, 0.0, 0.0};
@@ -169,11 +199,8 @@ void drawShipPosition() {
         double dist = geo::distance(enu[0], enu[1]);
         double angle = geo::angle(enu[0], enu[1]);
         
-        //printf("\n%d: [%f,%f], d:%f, angl:%f, [%f,%f,%f]\n"\
-               ,mmsi,lat,lon, dist, angle, enu[0], enu[1], enu[2]);
-        
-        if (cameraMin <= angle && angle <= cameraMax && dist < 5 * 1852) {
-            printf("\n%d: [%f,%f], d:%f, angl:%f, [%f,%f,%f]\n"\
+        if (cameraMin <= angle && angle <= cameraMax && dist <= distMax) {
+            //printf("\n%d: [%f,%f], d:%f, angl:%f, [%f,%f,%f]\n"\
                    ,mmsi,lat,lon, dist, angle, enu[0], enu[1], enu[2]);
             
             // enu(Mat版)
@@ -189,13 +216,13 @@ void drawShipPosition() {
                                    position.at<double>(2),
                                    position.at<double>(1));
         
-            std::cout << newPosition << std::endl;
+            //std::cout << newPosition << std::endl;
             
             // 射影変換
             cv::Mat ans = (pro.cameraMatrix * newPosition)\
                         / position.at<double>(1);
             
-            std::cout << ans << std::endl;
+            //std::cout << ans << std::endl;
             
             int imgX = int(ans.at<double>(0));
             int imgY = int(ans.at<double>(1));
@@ -203,6 +230,7 @@ void drawShipPosition() {
             cv::circle(img, cv::Point(imgX, imgY),\
                        5, cv::Scalar(255,0,0), -1, CV_AA);
             
+            // 船舶情報表示
             if (strflag == 0) {
                 std::stringstream str;
                 str << std::to_string(mmsi) << " ["\
@@ -273,12 +301,16 @@ void showCutImage() {
 }
 
 
-// 画像ファイル名変更
+// 画像ファイル名, 時刻変更
 void changeImage() {
     int num;
     std::cin >> num;
     pro.imnumber(num);
-    pro.changeElapsedTime(num * pro.interval);
+    
+    int stime = pro.startTime;
+    int sec = second(stime) + ((num - 1) * pro.interval);
+    int time = hour(sec);
+    pro.changeElapsedTime(time);
     flag = 0;
 }
 

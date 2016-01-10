@@ -43,7 +43,8 @@ double geo::blh2z(double latitude, double longitude, double height) {
 
 
 // 緯度軽度高度からECEFに変換する
-void geo::blh2ecef(double *latitude, double *longitude, double *height, double *ecef) {
+void geo::blh2ecef\
+    (double *latitude, double *longitude, double *height, double *ecef) {
     ecef[0] = blh2x(*latitude, *longitude, *height);
     ecef[1] = blh2y(*latitude, *longitude, *height);
     ecef[2] = blh2z(*latitude, *longitude, *height);

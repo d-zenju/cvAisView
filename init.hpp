@@ -36,6 +36,9 @@ public:
     // method: 経過時間変更
     void changeElapsedTime(int time);
     
+    // method: 時刻変換(hhmmss -> s)
+    void second(int time);
+    
     
     // 画像ファイル名
     std::string imname = directory + imnum + ext;
@@ -57,8 +60,7 @@ public:
     int startTime = 12100;
     int finishTime = 50130;
     int interval = 30;
-    int firstTime = 4830;
-    int elapsedTime = firstTime;
+    int elapsedTime = startTime;
     
     // 撮影地点座標(緯度,経度,高さ)
     //double ownLat = 35.311755;

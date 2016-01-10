@@ -32,5 +32,5 @@ void Property::readCameraParameter(void) {
 }
 
 void Property::changeElapsedTime(int time) {
-    elapsedTime = firstTime + time;
+    elapsedTime = time;
 }
